@@ -1,6 +1,3 @@
-<!--<div id="appdiv4"></div>-->
-
-
 /*FilePicker.js
 Uploads files to database from labkey.
 ENVIRONMENT must be defined as 1 (PRODUCTION) or 0 (DEVELOPMENT)

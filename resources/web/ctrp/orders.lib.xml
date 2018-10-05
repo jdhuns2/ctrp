@@ -1,0 +1,14 @@
+<libraries xmlns="http://labkey.org/clientLibrary/xml/">
+    <library compileInProductionMode="false">
+        <script path="ctrp/functions.js"/>
+        <script path="ctrp/printOrderSummary.js"/>
+        <script path="ctrp/stores.js"/>
+        <script path="ctrp/searchCombo.js"/>
+        <script path="ctrp/grid_purchase.js"/>
+        <script path="ctrp/grid_accordion.js"/>
+    </library>
+    <dependencies>
+        <dependency path="Ext4"/>
+        <dependency path="clientapi/ext4"/>
+    </dependencies>
+</libraries>

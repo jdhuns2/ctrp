@@ -1,0 +1,96 @@
+<div id="gridTarget"></div>
+<div id="accordionTarget"></div>
+<div id="loadPanelTarget"></div>
+<script type="text/javascript">
+
+    // Store the selected purchase_id in variable for ease of access.
+
+    Ext4.onReady(function() {
+
+        // Add load panel with loading mask for slow connections. This will be destroyed in init().
+        var loadPanel = new Ext4.panel.Panel({
+            title: 'Loading',
+            itemId: 'loadPanel',
+            renderTo: 'loadPanelTarget',
+            height: 200
+        });
+
+        var loadPanelMask = new Ext4.LoadMask(loadPanel, {msg:"Please wait..."});
+        loadPanelMask.show();
+
+        // Add listeners to and load stores
+        processedFilesStore.addListener('load', checkStoresLoaded);
+        purchasesViewStore.addListener('load', checkStoresLoaded);
+        purchaseDetailsStore.addListener('load', checkStoresLoaded);
+        addressesStore.addListener('load', checkStoresLoaded);
+        statusStore.addListener('load', checkStoresLoaded);
+        additionalInfoStore.addListener('load', checkStoresLoaded);
+        fileStore.addListener('load', checkStoresLoaded);
+        billingStore.addListener('load', checkStoresLoaded);
+        billingChargeTypesStore.addListener('load', checkStoresLoaded);
+        billingPaymentTypesStore.addListener('load', checkStoresLoaded);
+        qaChecklistStore.addListener('load', checkStoresLoaded);
+
+        processedFilesStore.load();
+        purchasesViewStore.load();
+        purchaseDetailsStore.load();
+        addressesStore.load();
+        statusStore.load();
+        additionalInfoStore.load();
+        fileStore.load();
+        billingStore.load();
+        billingChargeTypesStore.load();
+        billingPaymentTypesStore.load();
+        qaChecklistStore.load();
+
+        // Verify that all stores are loaded before firing init() to layout panels and webparts.
+        // initialLoad only true on page loads... stops init() from being fired when individual stores are loaded.
+        function checkStoresLoaded() {
+
+            var allStoresLoaded = true;
+
+            Ext4.StoreManager.each(function(store) {
+                if( store.storeId !== "ext-empty-store") {
+                    var currentStore = Ext4.StoreManager.lookup(store.storeId);
+                    if (currentStore.isLoading() === true) {
+                        allStoresLoaded = false;
+                    }
+                }
+            });
+
+            if (allStoresLoaded === true && initialLoad === true) {
+                initialLoad = false;
+                init();
+            }
+        }
+
+        window.onresize = function() {
+            purchaseGrid.doLayout();
+            accordion.doLayout();
+        };
+
+        /**
+         *************************************************************************
+         * The init() is called once all stores are loaded. This sets up the UI. *
+         *************************************************************************
+         */
+        function init() {
+
+            // remove the load panel and the mask
+            var loadPanel = Ext4.ComponentQuery.query('#loadPanel')[0];
+            loadPanel.destroy();
+            loadPanelMask.hide();
+            loadPanelMask.destroy();
+
+            /**
+             ***********************************
+             * GRIDS and PANELS and COMPONENTS *
+             ***********************************
+             */
+
+            //accordion.addListener('afterlayout');
+            accordion.render('accordionTarget');
+            purchaseGrid.render('gridTarget');
+        }
+    });
+</script>

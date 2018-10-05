@@ -1,0 +1,5 @@
+<view xmlns="http://labkey.org/data/xml/view" title="CTRP Orders">
+    <dependencies>
+        <dependency path="ctrp/orders.lib.xml"/>
+    </dependencies>
+</view>
