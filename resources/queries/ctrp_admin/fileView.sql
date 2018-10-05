@@ -1,0 +1,15 @@
+SELECT ctrpfile.id,
+ctrpfile.file_name,
+ctrpfile.file_size,
+ctrpfile.file_type,
+ctrpfile.hidden,
+ctrpfile.category,
+ctrpfile.description,
+ctrpfile.username,
+ctrpfile.institution,
+ctrpfile.purchase_id,
+ctrpfile.start_date,
+ctrpfile.end_date,
+ctrpfile.created,
+ctrpfile.modified
+FROM ctrpfile
