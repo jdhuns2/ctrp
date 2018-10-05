@@ -1,0 +1,496 @@
+<script type = "text/javascript">
+
+LABKEY.requiresScript('clientapi/ext4/Util.js');
+LABKEY.requiresScript('clientapi/ext4/data/Reader.js');
+LABKEY.requiresScript('clientapi/ext4/data/Proxy.js');
+LABKEY.requiresScript('clientapi/ext4/data/Store.js');
+// LABKEY.requiresScript('_webdav/CTRP_Admin/%40files/web/searchCombo.js');
+LABKEY.requiresScript('_webdav/CTRP_Admin/%40files/web/stores.js');
+LABKEY.requiresScript('_webdav/CTRP_Admin/%40files/web/functions.js');
+
+Ext4.onReady(function() {
+    
+    // models
+	/*
+    Ext4.define('profStudiesModel', {
+        extend: 'Ext.data.Model',
+        fields: [{
+            'name': 'purchase_id',
+            'type': 'string'
+        }, {
+          'name': 'prof_study_id',
+          'type': 'string'
+        }, {
+          'name': 'name',
+          'type': 'string'
+        }, {
+          'name': 'profstudy_reference_id',
+          'type': 'string'
+        }, 
+        //{
+        //     'name': 'quantity_ordered',
+        //     'type': 'number'
+        //},
+        {
+          'name': 'price_per_unit',
+          'type': 'number'
+        }, {
+          'name': 'total_cost',
+          'type': 'number'
+        }, {
+          'name': 'created',
+          'type': 'date'
+        }, {
+          'name': 'institution',
+          'type': 'string'
+        }, {
+          'name': 'username_display',
+          'type': 'string'
+        }, {
+          'name': 'description',
+          'type': 'string'
+        }, {
+          'name': 'workflow_category',
+          'type': 'string'
+        }, {
+          'name': 'dataloaded',
+          'type': 'string'
+        }, {
+          'name': 'shipping',
+          'type': 'string'
+        }, {
+          'name': 'billing',
+          'type': 'string'
+        }]
+    });
+    
+    Ext4.define('profStudyPieModel', {
+        extend: 'Ext.data.Model',
+        fields: ['studyType', 'studyCount', 'workflow_category']
+    });
+    */
+    // stores
+    function checkStoresLoaded() {
+      
+      var allStoresLoaded = true;
+      Ext4.StoreManager.each(function(store) {
+          if (store.storeId !== "ext-empty-store") {
+            var currentStore = Ext4.StoreManager.lookup(store.storeId);
+            if (currentStore.isLoading() === true) {
+              allStoresLoaded = false;
+            }
+          }
+      });
+      
+      if (allStoresLoaded === true) {
+        init();
+      }
+    }
+    
+    var profStudiesStore = Ext4.create('LABKEY.ext4.data.Store', {
+        schemaName: 'ctrp_admin',
+       //model: 'profStudiesModel',
+        queryName: 'profStudiesView',
+        storeId: 'profStudiesStore',
+        autoLoad: true,
+        listeners: {
+          load: function() {
+            checkStoresLoaded(this);
+          }
+        }
+    });
+    
+    var profStudyPieStore = Ext4.create('LABKEY.ext4.data.Store', {
+        schemaName: 'ctrp_admin',
+        //model: 'profStudyPieModel',
+        queryName: 'profStudyPie',
+        storeId: 'profStudyPieStore',
+        autoLoad: true,
+        listeners: {
+          load: function() {
+            checkStoresLoaded(this);
+          }
+        }
+    });
+    
+    var roundStore = Ext4.create('LABKEY.ext4.data.Store', {
+        schemaName: 'ctrp_admin',
+        storeId: 'roundStore',
+        sql: 'select distinct profstudy_reference_id as value, profstudy_reference_id as data  from profStudiesView',
+        autoLoad: true,
+        listeners: {
+          // On load, add a new field for 'show all' state, which is just blank.
+          load: function() {
+            roundStore.add({
+                data: 'show all',
+                value: ''
+            })
+            checkStoresLoaded(this);
+          }
+        }
+    });
+    
+    //
+    function init() {
+      
+      function selectDefaultStatus() {
+        var statusCombo = Ext4.ComponentQuery.query('#statusCombo')[0];
+        var valueToSelect = 'billing-shipped';
+        var rec = [statusCombo.findRecordByValue(valueToSelect)];
+        statusCombo.select(valueToSelect);
+        statusCombo.fireEvent('select', statusCombo, rec);
+      }
+      
+      function customFilterGrid() {
+        
+        var profStudyGrid = Ext4.ComponentQuery.query('#profStudyGrid')[0];
+        var profStudyGridStore = profStudyGrid.getStore();
+        var roundCombo = Ext4.ComponentQuery.query('#roundCombo')[0];
+        var statusCombo = Ext4.ComponentQuery.query('#statusCombo')[0];
+        var statusIds = [];
+        var roundIds = [];
+        var agg = [];
+        
+        profStudyGridStore.clearFilter(true);
+        
+        // The 'show all' state... just clear the filter and return.
+        if (roundCombo.value === '' && statusCombo.value === '') {
+          // return;
+        } else {
+          
+          // Iterate store to get all matches.
+          profStudyGridStore.each(function(rec) {
+              
+              if (rec.get('profstudy_reference_id') === roundCombo.value) {
+                Ext4.Array.push(roundIds, rec.data.prof_study_id);
+              }
+              
+              if (rec.get('workflow_category') === statusCombo.value) {
+                Ext4.Array.push(statusIds, rec.data.prof_study_id);
+              }
+              
+          });
+          
+          // If the arrays are both populated, then intersect. Otherwise, merge them.
+          if (roundIds.length > 0 && statusIds.length > 0) {
+            agg = Ext4.Array.intersect(roundIds, statusIds);
+          } else {
+            agg = Ext4.Array.merge(roundIds, statusIds);
+          }
+          
+          profStudyGridStore.filterBy(
+            function(rec, id) {
+              if (Ext4.Array.contains(agg, rec.data.prof_study_id)) {
+                return true;
+              } else {
+                return false;
+              }
+            })
+          
+        }
+        
+        var headerText = Ext4.ComponentQuery.query('#profStudyGridHeaderText')[0];
+        headerText.setText('Current Rows: ' + profStudyGridStore.count());
+        profStudyGrid.getView().refresh()
+        
+      }
+      
+      
+      function countTotalDataLoaded(val) {
+		  var totalSubmitted = 0;
+		  for(i = 0; i < val.length; i++){
+			  if(val[i].get('dataloaded').includes('yes')){
+				  totalSubmitted++;
+			  }
+		  }
+        console.log('===RECORDS', val);
+        return totalSubmitted;
+      }
+      
+      // grid
+      var profStudyGrid = new Ext4.grid.GridPanel({
+          title: 'Proficiency Studies',
+          store: profStudiesStore,
+          itemId: 'profStudyGrid',
+          resizable: true,
+          width: '99%',
+          features: [{
+              ftype: 'summary'
+          }],
+          dockedItems: [{
+              xtype: 'toolbar',
+              dock: 'top',
+              items: [
+                // searchComboProfStudy,
+                {
+                  xtype: 'combo',
+                  fieldLabel: 'Select a status category',
+                  displayField: 'name',
+                  valueField: 'value',
+                  width: 320,
+                  labelWidth: 150,
+                  store: statusCategories,
+                  editable: false,
+                  multiSelect: false,
+                  queryMode: 'local',
+                  itemId: 'statusCombo',
+                  listeners: {
+                    'select': function(combo, record) {
+                      customFilterGrid(combo, record)
+                    }
+                  }
+                }, {
+                  xtype: 'combo',
+                  fieldLabel: 'Select round',
+                  store: roundStore,
+                  displayField: 'data',
+                  valueField: 'value',
+                  width: 200,
+                  labelWidth: 80,
+                  margin: '0 0 0 20',
+                  editable: false,
+                  multiSelect: false,
+                  queryMode: 'local',
+                  itemId: 'roundCombo',
+                  listeners: {
+                    'select': function(combo, record) {
+                      customFilterGrid(combo, record)
+                    }
+                  }
+                },
+                {
+                  xtype: 'text',
+                  itemId: 'profStudyGridHeaderText',
+                  margin: '0 0 0 20'
+                },
+                {
+                  xtype: 'tbfill'
+                }, {
+                  xtype: 'button',
+                  text: 'Export to Excel',
+                  handler: function() {
+                    var profStudyGrid = Ext4.ComponentQuery.query('#profStudyGrid')[0];
+                    var profStudyGridStore = profStudyGrid.getStore();
+                    convertStoreToExcel(profStudyGridStore);
+                  }
+                }, {
+                  xtype: 'button',
+                  text: 'Save Chart',
+                  handler: function() {
+                    
+                    var salesChart = Ext4.ComponentQuery.query('#salesChart')[0]
+                    salesChart.save({
+                        type: 'image/png'
+                    });
+                  }
+                }
+              ]
+          }],
+          columns: [{
+              id: 'Purchase Id',
+              header: 'Purchase Id',
+              width: 80,
+              sortable: true,
+              dataIndex: 'purchase_id',
+              summaryType: 'count',
+              summaryRenderer: function(value) {
+                return Ext4.String.format('<strong>total: {0}</strong>', value );
+              }
+              
+              
+          }, {
+            header: 'Prof Study Id',
+            width: 80,
+            sortable: true,
+            dataIndex: 'prof_study_id'
+          }, {
+            header: 'Name',
+            dataIndex: 'name',
+            width: 275,
+            sortable: true
+          }, {
+            header: 'Round',
+            dataIndex: 'profstudy_reference_id',
+            width: 75,
+            sortable: true
+          }, {
+            header: 'Institution',
+            dataIndex: 'shipping_institution',
+            flex: 1,
+            sortable: true
+          }, {
+            header: 'User',
+            dataIndex: 'username_display',
+            flex: 1,
+            sortable: true
+          }, {
+            header: 'Data',
+            dataIndex: 'dataloaded',
+            width: 60,
+            sortable: true,
+            summaryType: countTotalDataLoaded,
+            //summaryRenderer: countTotalDataLoaded()
+            //summaryRenderer: function(value, summaryData, dataIndex) {
+            //  console.log('data loaded ', value, summaryData, dataIndex);
+            //  if (value === 'yes') { 
+            //    return Ext4.String.format('<strong>total loaded: {0}</strong>', value );
+            //  }
+            //}
+          }, {
+            header: 'Price',
+            dataIndex: 'price_per_unit',
+            width: 60,
+            sortable: true,
+            renderer: Ext4.util.Format.usMoney,
+            summaryType: 'sum',
+            summaryRenderer: function(value, summaryData, dataIndex) {
+              return Ext4.String.format('<strong>total: {0}</strong>', Ext4.util.Format.usMoney(value));
+            }
+          }, 
+          //{
+          //   header: 'Qty.',
+          //   dataIndex: 'quantity_ordered',
+          //   width: 70,
+          //   sortable: true,
+          //   summaryType: 'count',
+          //   summaryRenderer: function(value, summaryData, dataIndex) {
+          //       return Ext4.String.format('<strong>total: {0}</strong>', Ext4.util.Format.number(value));
+          //   }
+          //}, 
+          //  {
+          //      header: 'Cost',
+          //      dataIndex: 'total_cost',
+          //      width: 125,
+          //      sortable: true,
+          //      renderer: Ext4.util.Format.usMoney,
+          //      summaryType: 'sum',
+          //      summaryRenderer: function(value, summaryData, dataIndex) {
+					////debugger;
+          //          return Ext4.String.format('<strong>total: {0}</strong>', Ext4.util.Format.usMoney(value));
+          //      }
+          //}, 
+          {
+            header: 'Shipping',
+            dataIndex: 'shipping',
+            width: 60,
+            sortable: true,
+            hidden: true
+          }, {
+            header: 'Billing',
+            dataIndex: 'billing',
+            width: 60,
+            sortable: true,
+            hidden: true
+          }, {
+            header: 'Created',
+            dataIndex: 'created',
+            width: 100,
+            sortable: true,
+            type: 'date',
+            dateFormat: 'Y/m/d H:i:s',
+            renderer: Ext4.util.Format.dateRenderer('m/d/Y H:i:s')
+          }, {
+            header: 'Status',
+            dataIndex: 'description',
+            flex: 1,
+            sortable: true
+          }, {
+            header: 'Workflow Category',
+            dataIndex: 'workflow_category',
+            flex: 1,
+            sortable: true,
+            hidden: true
+          }],
+          renderTo: 'gridTarget',
+          listeners: {
+            'afterrender': function(theGrid) {
+              selectDefaultStatus();
+            },
+            'beforeitemdblclick': function( theGrid, record, item, index )  {
+              var URL = 'https://mcclabkey.uky.edu/labkey/project/CTRP_Admin/begin.view?purchase_id='+record.data.purchase_id;
+              window.open(URL, '_blank');
+            }
+          }
+      });
+      
+      // bar chart
+      var barChart = Ext4.create('Ext4.chart.Chart', {
+          renderTo: 'salesDiv',
+          itemId: 'salesChart',
+          width: '100%',
+          height: 400,
+          store: profStudyPieStore,
+          shadow: true,
+          animate: true,
+          axes: [{
+              title: 'Proficiency Studies',
+              type: 'Category',
+              position: 'left',
+              fields: ['studyType'],
+              renderer: Ext4.util.Format.usMoney,
+              minimum: 0,
+              maximum: 50,
+              grid: true
+          }, {
+            title: 'Sales',
+            type: 'Numeric',
+            position: 'bottom',
+            fields: ['studyCount'],
+            grid: true,
+            width: 150
+          }],
+          series: [{
+              type: 'bar',
+              axis: 'left',
+              highlight: true,
+              style: {
+                fill: '#456d9f'
+              },
+              highlightCfg: {
+                fill: '#a2b5ca'
+              },
+              label: {
+                display: 'insideEnd',
+                field: 'studyCount',
+                color: '#000',
+                orientation: 'horizontal'
+              },
+              listeners: {
+                'itemmouseup': function(item) {
+                  var series = barChart.series.get(0),
+                  index = Ext4.Array.indexOf(series.items, item),
+                  selectionModel = gridPanel.getSelectionModel();
+                  
+                  selectedStoreItem = item.storeItem;
+                  selectionModel.select(index);
+                }
+              },
+              xField: 'studyType',
+              yField: 'studyCount'
+          }],
+          tbar: [{
+              text: 'Save Chart'
+          }]
+          
+      });
+      
+      /**
+      -------------------------------------------------------------------------------------------
+      Helper to manage vp size on load and on window resize
+      -------------------------------------------------------------------------------------------
+      */
+      Ext4.EventManager.onWindowResize(function() {
+          doLayout();
+      });
+      
+      function doLayout() {
+        var v = Ext4.ComponentQuery.query('#profStudyGrid')[0];
+        v.doLayout();
+      }
+    }
+});
+
+</script>
+
+<div id = "salesDiv"> </div>
+<div id = "gridTarget"> </div>
