@@ -1,0 +1,5 @@
+<view xmlns="http://labkey.org/data/xml/view" title="Welcome to CTRP">
+    <dependencies>
+        <dependency path="ctrp/foo.js"/>
+    </dependencies>
+</view>
